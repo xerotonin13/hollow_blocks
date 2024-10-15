@@ -8,7 +8,6 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, request
 
-import requests
 from urllib.parse import urlparse
 
 class Blockchain(object):
