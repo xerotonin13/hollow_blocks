@@ -26,10 +26,9 @@ class Blockchain(object):
         genesis_hash = self.hash_block("genesis_block")
         #I GOT STUCK SOMEWHERE HERE BRB
         self.append(
-            hash_of_previous_block = genesis_hash,
+        hash_of_previous_block = genesis_hash,
             nonce = self.proof_of_work(0, genesis_hash, [])
-        )
-    
+        )    
     #Finding the nonce
     def proof_of_work(self, index, hash_of_previous_block, transactions):
         nonce = 0
@@ -41,10 +40,30 @@ class Blockchain(object):
         content = f'{index}{hash_of_previous_block}{transactions}{nonce}'.encode()
         content_hash = hashlib.sha256(content).hexdigest()
         return content_hash[:len(self.difficulty_target)] == self.difficulty_target
-    @property
-    def last_block(self):
-        return self.chain[-1]
     
+    def append_block(self, nonce, hash_of_previous_block):
+        block = {
+            'index': len(self.chain),
+            'timestamp': time(),
+            'transactions': self.current_transactions,
+            'nonce' : nonce,
+            'hash_of_previous_block': hash_of_previous_block
+        }
+        self.current_transactions = []
+        self.chain.append(block)
+        return block
+    
+    def add_transaction(self, sender, recipient, amount):
+        self.current_transactions.append({
+            'amount': amount,
+            'recipient': recipient,
+            'sender': sender,
+        })
+        return self.last_block['index'] + 1
+    @property
+    def lask_block(self):
+        return self.chain[-1]
+        
 #Exposing the Blockchain class as a REST API
 app = Flask(__name__)
 node_identifier = str(uuid4()).replace('-', "")
@@ -58,6 +77,26 @@ def full_chain():
         'chain': blockchain.chain,
         'length': len(blockchain.chain),
         }
+    return jsonify(response), 200
+
+@app.route('/mine', methods = ['GET'])
+def mine_block():
+    blockchain.add_transaction(
+        sender = "0",
+        recipient = node_identifier,
+        amount = 1,
+    )
+    last_block_hash = blockchain.hash_block(blockchain.lask_block)
+    index = len(blockchain.chain)
+    nonce = blockchain.proof_of_work(index, last_block_hash, blockchain.current_transactions)
+    block = blockchain.append_block(nonce, last_block_hash)
+    response = {
+        'message': "New Block Mined",
+        'index': block['index'],
+        'hash_of_previous_block': block['hash_of_previous_block'],
+        'nonce': block['nonce'],
+        'transactions': ['transactions'],
+    }
     return jsonify(response), 200
 
 #Adding Transactions
@@ -79,3 +118,6 @@ def new_transaction():
     response = {'message':
         f'Transaction will be added to Block {index}'}
     return (jsonify(response), 201)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(sys.argv[1]))
