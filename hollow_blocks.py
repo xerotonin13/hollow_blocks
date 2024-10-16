@@ -24,7 +24,7 @@ class Blockchain(object):
         self.current_transactions = []
         genesis_hash = self.hash_block("genesis_block")
         #I GOT STUCK SOMEWHERE HERE BRB
-        self.append(
+        self.append_block(
         hash_of_previous_block = genesis_hash,
             nonce = self.proof_of_work(0, genesis_hash, [])
         )    
