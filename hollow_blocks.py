@@ -119,5 +119,3 @@ def new_transaction():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(sys.argv[1]))
-
-fn = open('C:\\Users\\vanes\\hollow_blocks.py', 'r')
