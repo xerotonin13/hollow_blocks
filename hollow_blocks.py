@@ -20,13 +20,36 @@ class Blockchain(object):
         return hashlib.sha256(block_encoded).hexdigest()
     
     def __init__(self):
+        self.nodes = set()
         self.chain = []
         self.current_transactions = []
         genesis_hash = self.hash_block("genesis_block")
         self.append_block(
         hash_of_previous_block = genesis_hash,
-            nonce = self.proof_of_work(0, genesis_hash, [])
-        )    
+            nonce = self.proof_of_work(0, genesis_hash, []))
+    
+    def add_node(self, address):
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)
+        print(parsed_url.netloc)
+        
+    def valid_chain(self, chain):
+        last_block = chain[0]
+        current_index = 1
+        while current_index < len(chain):
+            block = chain[current_index]
+            if block['hash_of_previous_block'] != self.hash_block(last_block):
+                return False
+            if not self.valid_proof(
+                current_index,
+                block['hash_of_previous_block'],
+                block['transactions'],
+                block['nonce']):
+                return False
+            last_block = block
+            current_index += 1
+            return True
+            
     #Finding the nonce
     def proof_of_work(self, index, hash_of_previous_block, transactions):
         nonce = 0
@@ -59,9 +82,26 @@ class Blockchain(object):
         })
         return self.last_block['index'] + 1
     @property
+    
     def lask_block(self):
         return self.chain[-1]
-        
+    
+    def update_blockchain(self):
+        neighbours = self.nodes
+        new_chain = None
+        max_length = len(self.chain)
+        for node in neighbours:
+            response = request.get(f'http://{node}/blockchain')
+            if response.status_code == 200:
+                length = response.json()['length']
+                chain = response.json()['chain']
+                if length > max_length and self.valid_chain(chain):
+                    max_length = length
+                    new_chain = chain
+            if new_chain:
+                self.chain = new_chain
+                return True
+            
 #Exposing the Blockchain class as a REST API
 app = Flask(__name__)
 node_identifier = str(uuid4()).replace('-', "")
@@ -97,6 +137,34 @@ def mine_block():
     }
     return jsonify(response), 200
 
+@app.route('/nodes/add_nodes', methods=['POST'])
+def add_nodes():
+    values = request.get_json()
+    nodes = values.get('nodes')
+
+    if nodes is None:
+        return "Error: Missing node(s) info", 400
+    
+    for node in nodes:
+        blockchain.add_node(node)
+    response = {
+        'message': "New nodes added",
+        'nodes': list(blockchain.nodes),
+    }
+    return jsonify(response), 201
+@app.route('/nodes/sync', methods=['GET'])
+def sync():
+    updated = blockchain.update_blockchain()
+    if updated:
+        response = {
+            'message':
+            'The blockchain has been updated to the latest', 'blockchain': blockchain.chain
+        }
+    else:
+        response = {
+            'message': 'Our blockchain is the latest', 'blockchain': blockchain.chain
+        }
+    return jsonify(response), 200
 #Adding Transactions
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
